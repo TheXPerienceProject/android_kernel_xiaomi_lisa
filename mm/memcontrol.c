@@ -6376,12 +6376,6 @@ struct cgroup_subsys memory_cgrp_subsys = {
  * WARNING: This function is not stateless! It can only be used as part
  *          of a top-down tree iteration, not for isolated queries.
  *
- * Returns one of the following:
- *   MEMCG_PROT_NONE: cgroup memory is not protected
- *   MEMCG_PROT_LOW: cgroup memory is protected as long there is
- *     an unprotected supply of reclaimable memory from other cgroups.
- *   MEMCG_PROT_MIN: cgroup memory is protected
- *
  * @root is exclusive; it is never protected when looked at directly
  *
  * To provide a proper hierarchical behavior, effective memory.min/low values
@@ -6438,8 +6432,8 @@ struct cgroup_subsys memory_cgrp_subsys = {
  * for next usage. This part is intentionally racy, but it's ok,
  * as memory.low is a best-effort mechanism.
  */
-enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
-						struct mem_cgroup *memcg)
+void mem_cgroup_calculate_protection(struct mem_cgroup *root,
+				     struct mem_cgroup *memcg)
 {
 	struct mem_cgroup *parent;
 	unsigned long emin, parent_emin;
@@ -6447,7 +6441,7 @@ enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
 	unsigned long usage;
 
 	if (mem_cgroup_disabled())
-		return MEMCG_PROT_NONE;
+		return;
 
 	if (!root)
 		root = root_mem_cgroup;
@@ -6460,11 +6454,11 @@ enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
 	 * that special casing.
 	 */
 	if (memcg == root)
-		return MEMCG_PROT_NONE;
+		return;
 
 	usage = page_counter_read(&memcg->memory);
 	if (!usage)
-		return MEMCG_PROT_NONE;
+		return;
 
 	emin = memcg->memory.min;
 	elow = memcg->memory.low;
@@ -6472,10 +6466,10 @@ enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
 	parent = parent_mem_cgroup(memcg);
 	/* No parent means a non-hierarchical mode on v1 memcg */
 	if (!parent)
-		return MEMCG_PROT_NONE;
+		return;
 
 	if (parent == root)
-		goto exit;
+		return;
 
 	parent_emin = READ_ONCE(parent->memory.emin);
 	emin = min(emin, parent_emin);
@@ -6505,16 +6499,6 @@ enum mem_cgroup_protection mem_cgroup_protected(struct mem_cgroup *root,
 				   siblings_low_usage);
 	}
 
-exit:
-	memcg->memory.emin = emin;
-	memcg->memory.elow = elow;
-
-	if (usage <= emin)
-		return MEMCG_PROT_MIN;
-	else if (usage <= elow)
-		return MEMCG_PROT_LOW;
-	else
-		return MEMCG_PROT_NONE;
 }
 
 /**
