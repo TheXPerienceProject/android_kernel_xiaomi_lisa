@@ -864,6 +864,8 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
 
 extern int kern_addr_valid(unsigned long addr);
 
+#define arch_has_hw_pte_young	cpu_has_hw_af
+
 #include <asm-generic/pgtable.h>
 
 /*
