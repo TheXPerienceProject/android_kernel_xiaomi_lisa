@@ -1071,6 +1071,12 @@ struct ufs_hba {
 #if defined(CONFIG_UFSFEATURE)
 	struct ufsf_feature ufsf;
 #endif
+
+#ifdef CONFIG_SCSI_UFSHCD_QTI
+	/* distinguish between resume and restore */
+	bool restore;
+	bool abort_triggered_wlun;
+#endif
 };
 
 /* Returns true if clocks can be gated. Otherwise false */
