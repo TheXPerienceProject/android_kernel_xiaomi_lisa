@@ -365,7 +365,7 @@ struct page *__read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 	struct page *found_page = NULL, *new_page = NULL;
 	struct swap_info_struct *si;
 	int err;
-	void *shadow;
+	void *shadow = NULL;
 
 	*new_page_allocated = false;
 

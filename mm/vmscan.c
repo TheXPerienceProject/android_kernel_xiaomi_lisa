@@ -970,7 +970,7 @@ static int __remove_mapping(struct address_space *mapping, struct page *page,
 		if (lru_gen_enabled())
 			shadow = lru_gen_eviction(page);
 		mem_cgroup_swapout(page, swap);
-		__delete_from_swap_cache(page, shadow);
+		__delete_from_swap_cache(page, swap);
 		xa_unlock_irqrestore(&mapping->i_pages, flags);
 		put_swap_page(page, swap);
 	} else {
@@ -1187,7 +1187,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			goto keep_locked;
 
 		/* page_update_gen() tried to promote this page? */
-		if (lru_gen_enabled() && !&force_reclaim &&
+		if (lru_gen_enabled() && !ignore_references &&
 		    page_mapped(page) && PageReferenced(page))
 			goto keep_locked;
 
@@ -3047,7 +3047,7 @@ static void age_lruvec(struct lruvec *lruvec, struct scan_control *sc)
 	if (!mem_cgroup_online(memcg))
 		nr_to_scan++;
 
-	if (nr_to_scan && need_aging && (!mem_cgroup_low(NULL, memcg) || sc->memcg_low_reclaim))
+	if (nr_to_scan && need_aging && (!mem_cgroup_below_low(memcg) || sc->memcg_low_reclaim))
 		inc_max_seq(lruvec, max_seq);
 }
 
