@@ -2667,7 +2667,7 @@ static int page_lru_tier(struct page *page)
 	return lru_tier_from_refs(refs);
 }
 
-static struct lruvec *get_lruvec(struct mem_cgroup *memcg, int nid)
+static struct lruvec __maybe_unused *get_lruvec(struct mem_cgroup *memcg, int nid)
 {
 	struct pglist_data *pgdat = NODE_DATA(nid);
 
@@ -3442,6 +3442,7 @@ static int evict_pages(struct lruvec *lruvec, struct scan_control *sc, int swapp
 	LIST_HEAD(list);
 	struct page *page;
 	enum vm_event_item item;
+	struct reclaim_stat stat;
 	struct mem_cgroup *memcg = lruvec_memcg(lruvec);
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
 
@@ -3460,7 +3461,7 @@ static int evict_pages(struct lruvec *lruvec, struct scan_control *sc, int swapp
 	if (list_empty(&list))
 		return scanned;
 
-	reclaimed = shrink_page_list(&list, pgdat, sc, 0, NULL, false);
+	reclaimed = shrink_page_list(&list, pgdat, sc, 0, &stat, false);
 
 	/*
 	 * To avoid livelock, don't add rejected pages back to the same lists
@@ -3478,17 +3479,17 @@ static int evict_pages(struct lruvec *lruvec, struct scan_control *sc, int swapp
 
 	spin_lock_irq(&pgdat->lru_lock);
 
-	putback_inactive_pages(lruvec, &list);
+	move_pages_to_lru(lruvec, &list);
 
 	item = current_is_kswapd() ? PGSTEAL_KSWAPD : PGSTEAL_DIRECT;
-	if (global_reclaim(sc))
+	if (!global_reclaim(sc))
 		__count_vm_events(item, reclaimed);
 	__count_memcg_events(memcg, item, reclaimed);
 
 	spin_unlock_irq(&pgdat->lru_lock);
 
 	mem_cgroup_uncharge_list(&list);
-	free_hot_cold_page_list(&list, true);
+	free_unref_page_list(&list);
 
 	sc->nr_reclaimed += reclaimed;
 
