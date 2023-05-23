@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_MSM_IPA_H_
@@ -1405,6 +1407,8 @@ enum ipa_hdr_l2_type {
  * IPA_HDR_PROC_EoGRE_HEADER_ADD:       Add IPV[46] and GRE header
  * IPA_HDR_PROC_EoGRE_HEADER_REMOVE:    Remove IPV[46] and GRE header
  * IPA_HDR_PROC_WWAN_TO_ETHII_EX:		To update PCP value for E2E traffic.
+ * IPA_HDR_PROC_GRE_HEADER_ADD,         Add IPV[46] and IP-GRE header
+ * IPA_HDR_PROC_GRE_HEADER_REMOVE,      Remove IPV[46] and IP-GRE header
  */
 enum ipa_hdr_proc_type {
 	IPA_HDR_PROC_NONE,
@@ -1421,8 +1425,10 @@ enum ipa_hdr_proc_type {
 	IPA_HDR_PROC_EoGRE_HEADER_ADD,
 	IPA_HDR_PROC_EoGRE_HEADER_REMOVE,
 	IPA_HDR_PROC_WWAN_TO_ETHII_EX,
+	IPA_HDR_PROC_GRE_HEADER_ADD,
+	IPA_HDR_PROC_GRE_HEADER_REMOVE
 };
-#define IPA_HDR_PROC_MAX (IPA_HDR_PROC_WWAN_TO_ETHII_EX + 1)
+#define IPA_HDR_PROC_MAX (IPA_HDR_PROC_GRE_HEADER_REMOVE + 1)
 
 /**
  * struct ipa_rt_rule - attributes of a routing rule
@@ -1595,9 +1601,35 @@ struct IpaDscpVlanPcpMap_t {
 	/*
 	 * dscp[vlan][pcp], valid only lower 6 bits, using pcp as index
 	 */
-	uint8_t dscp[IPA_EoGRE_MAX_VLAN][IPA_EoGRE_MAX_PCP_IDX];
-	uint8_t num_vlan; /* indicate how many vlans valid */
-	uint8_t reserved0;
+	uint8_t  dscp[IPA_EoGRE_MAX_VLAN][IPA_EoGRE_MAX_PCP_IDX];
+	uint8_t  num_vlan;   /* indicate how many vlans valid vlan above */
+	uint8_t  num_s_vlan; /* indicate how many vlans valid in s_vlan below */
+	uint8_t  dscp_opt;   /* indicates if dscp is required or optional */
+	uint8_t  pad1; /* for alignment */
+	/*
+	 * The same lookup scheme, using vlan[] above, is used for
+	 * generating the first index of mpls below; and in addition,
+	 * we've added a similar array, s_vlan[], for generating the
+	 * second index below.
+	 */
+	uint16_t s_vlan[IPA_GRE_MAX_S_VLAN];
+	/*
+	 * mpls[C-Tag vlan][S-Tag vlan] -> Only the lower 20 bits of the
+	 * 32-bit mpls value will be used, since that's the size of the
+	 * MPLS label component.
+	 */
+	uint32_t mpls[IPA_EoGRE_MAX_VLAN][IPA_GRE_MAX_S_VLAN];
+	/*
+	 * following three arrays are used for DL vlan tag lookup
+	 * mpls_val_sorted is in ascending order, by mpls label values in mpls array
+	 * vlan_c and vlan_s are vlan id values that are corresponding to the mpls label
+	 */
+	uint16_t pad2; /* for alignment */
+	uint8_t  pad3; /* for alignment */
+	uint8_t  num_mpls_val_sorted; /* num of elements in mpls_val_sorted */
+	uint32_t mpls_val_sorted[IPA_EoGRE_MAX_VLAN * IPA_GRE_MAX_S_VLAN];
+	uint16_t  vlan_c[IPA_EoGRE_MAX_VLAN * IPA_GRE_MAX_S_VLAN];
+	uint16_t  vlan_s[IPA_EoGRE_MAX_VLAN * IPA_GRE_MAX_S_VLAN];
 } __packed;
 
 struct ipa_ipgre_info {
@@ -1653,6 +1685,52 @@ struct ipa_eogre_header_remove_procparams {
 struct ipa_eogre_hdr_proc_ctx_params {
 	struct ipa_eogre_header_add_procparams hdr_add_param;
 	struct ipa_eogre_header_remove_procparams hdr_remove_param;
+};
+
+
+/**
+ * struct ipa_gre_header_add_procparams -
+ * @eth_hdr_retained:  Specifies if Ethernet header is retained or not
+ * @input_ip_version:  Specifies if Input header is IPV4(0) or IPV6(1)
+ * @output_ip_version: Specifies if template header's outer IP is IPV4(0) or IPV6(1)
+ * @second_pass:       Specifies if the data should be processed again.
+ * @is_mpls:           Specifies if ucp cmd is for legacy EoGRE(0) or MPLSoGRE(1)
+ * @tag_remove_len:    Specifies amount to be removed for the tags
+ */
+struct ipa_gre_header_add_procparams {
+	uint32_t eth_hdr_retained :1;
+	uint32_t input_ip_version :1;
+	uint32_t output_ip_version :1;
+	uint32_t second_pass :1;
+	uint32_t is_mpls :1;
+	uint32_t tag_remove_len :4;
+	uint32_t reserved :23;
+};
+
+/**
+ * struct ipa_gre_header_remove_procparams -
+ * @hdr_len_remove:    Specifies how much (in bytes) of the header needs
+ *                     to be removed
+ * @outer_ip_version:  Specifies if template header's outer IP is IPV4(0) or IPV6(1)
+ * @is_mpls:           Specifies if ucp cmd is for legacy EoGRE(0) or MPLSoGRE(1)
+ * @tag_add_len:       Specifies amount to be added for the tags
+ */
+struct ipa_gre_header_remove_procparams {
+	uint32_t hdr_len_remove :8; /* 44 bytes for IPV6, 24 for IPV4 */
+	uint32_t outer_ip_version :1;
+	uint32_t is_mpls :1;
+	uint32_t tag_add_len :4;
+	uint32_t reserved :18;
+};
+
+/**
+ * struct ipa_gre_hdr_proc_ctx_params -
+ * @hdr_add_param: parameters for header add
+ * @hdr_remove_param: parameters for header remove
+ */
+struct ipa_gre_hdr_proc_ctx_params {
+	struct ipa_gre_header_add_procparams hdr_add_param;
+	struct ipa_gre_header_remove_procparams hdr_remove_param;
 };
 
 /**
@@ -1716,6 +1794,7 @@ struct ipa_hdr_proc_ctx_add {
 	struct ipa_eogre_hdr_proc_ctx_params eogre_params;
 	struct ipa_eth_II_to_eth_II_ex_procparams generic_params;
 	struct ipa_wwan_to_eth_II_ex_procparams generic_params_v2;
+	struct ipa_gre_hdr_proc_ctx_params gre_params;
 };
 
 #define IPA_L2TP_HDR_PROC_SUPPORT

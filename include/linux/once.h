@@ -17,6 +17,11 @@ bool __do_once_slow_start(bool *done);
 void __do_once_slow_done(bool *done, struct static_key_true *once_key,
 			 struct module *mod);
 
+/* Variant for process contexts only. */
+bool __do_once_slow_start(bool *done);
+void __do_once_slow_done(bool *done, struct static_key_true *once_key,
+			 struct module *mod);
+
 /* Call a function exactly once. The idea of DO_ONCE() is to perform
  * a function call such as initialization of random seeds, etc, only
  * once, where DO_ONCE() can live in the fast-path. After @func has
@@ -55,6 +60,23 @@ void __do_once_slow_done(bool *done, struct static_key_true *once_key,
 				func(__VA_ARGS__);			     \
 				__do_once_done(&___done, &___once_key,	     \
 					       &___flags, THIS_MODULE);	     \
+			}						     \
+		}							     \
+		___ret;							     \
+	})
+
+/* Variant of DO_ONCE() for process/sleepable contexts. */
+#define DO_ONCE_SLOW(func, ...)						     \
+	({								     \
+		bool ___ret = false;					     \
+		static bool __section(.data.once) ___done = false;	     \
+		static DEFINE_STATIC_KEY_TRUE(___once_key);		     \
+		if (static_branch_unlikely(&___once_key)) {		     \
+			___ret = __do_once_slow_start(&___done);	     \
+			if (unlikely(___ret)) {				     \
+				func(__VA_ARGS__);			     \
+				__do_once_slow_done(&___done, &___once_key,  \
+						    THIS_MODULE);	     \
 			}						     \
 		}							     \
 		___ret;							     \

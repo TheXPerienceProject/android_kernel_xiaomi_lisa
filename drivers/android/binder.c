@@ -3573,6 +3573,7 @@ static void binder_transaction(struct binder_proc *proc,
 		tcomplete->type = BINDER_WORK_TRANSACTION_ONEWAY_SPAM_SUSPECT;
 	else
 		tcomplete->type = BINDER_WORK_TRANSACTION_COMPLETE;
+
 	t->work.type = BINDER_WORK_TRANSACTION;
 
 	if (reply) {
