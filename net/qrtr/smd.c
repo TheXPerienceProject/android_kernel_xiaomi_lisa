@@ -96,7 +96,6 @@ static int qcom_smd_qrtr_probe(struct rpmsg_device *rpdev)
 
 	if (rc)
 		return rc;
-	}
 
 	dev_set_drvdata(&rpdev->dev, qdev);
 

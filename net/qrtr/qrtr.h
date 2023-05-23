@@ -29,11 +29,7 @@ struct qrtr_endpoint {
 };
 
 int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
-<<<<<<< HEAD
-			   bool rt, u32 *svc_arr, int size);
-=======
 			   bool rt, u32 *svc_arr);
->>>>>>> LA.UM.9.16.r1-12900-MANNAR.QSSI13.0
 
 void qrtr_endpoint_unregister(struct qrtr_endpoint *ep);
 

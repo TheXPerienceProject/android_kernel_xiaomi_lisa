@@ -1974,7 +1974,6 @@ lookup:
 		goto done;
 	}
 
-lookup:
 	vma_interval_tree_foreach(vma, &mapping->i_mmap,
 			pgoff_start, pgoff_end) {
 		unsigned long address = vma_address(page, vma);
